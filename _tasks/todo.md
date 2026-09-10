@@ -1,97 +1,74 @@
-# Tâche — we-finalise : formulaires + modules Rank Math remplis
+# Tâche — we-finalise : recommandations SEO Google
 
 ## Objectif
-1. Vérifier tous les formulaires du site : destinataire présent et `From email`
-   au format `formulaire@<domaine de prod>`, domaine dérivé par analyse de l'URL.
-2. Poser comme règle que les trois modules Rank Math (LLMs.txt, SEO Local, Schema)
-   sont *remplis* et non seulement activés, à partir d'infos trouvées sur le site.
+Intégrer les recommandations du guide de démarrage SEO de Google
+(developers.google.com/search/docs/fundamentals/seo-starter-guide) sous forme de contrôles
+vérifiables à la finalisation, et poser la règle : corriger ce qui est corrigeable, poser
+la question quand une information manque.
 
 ## Plan
 
-- [x] 1. `scripts/php/forms-audit.php` + `scripts/forms-audit.sh`
-      Découvre tous les formulaires : nœuds Breakdance (recherche par type + chemins
-      JSON des valeurs email), plugins de formulaires tiers actifs, config d'envoi
-      (plugin SMTP, `admin_email`). Contrôle destinataire non vide et conformité du
-      `From` à `formulaire@<domaine>`. → `.we-finalise/forms.json`
-- [x] 2. `scripts/php/apply-forms.php` + `scripts/apply-forms.sh`
-      Écriture par chemin JSON dans `breakdance_data` (set d'une valeur à un chemin
-      précis, pas un remplacement de texte), `--dry-run` d'abord.
-- [x] 3. `scripts/site-info.mjs`
-      Extraction des infos client depuis le texte des pages déjà capturé par
-      front-audit : emails, téléphones, adresses, SIRET, horaires, réseaux.
-      → `.we-finalise/site-info.json`. Alimente SEO Local et détecte les écarts NAP.
-- [x] 4. `references/formulaires.md` (nouveau)
-      Doctrine : destinataire obligatoire, `From` = `formulaire@domaine` et pourquoi,
-      Reply-To, dérivation du domaine, test d'envoi réel, délivrabilité (SPF/DKIM).
-- [x] 5. `references/rankmath.md`
-      Critères d'acceptation par module : ce qui fait qu'un module est « rempli ».
-- [x] 6. `SKILL.md`
-      Nouvelle règle sur les modules Rank Math remplis. Étape 6 : phase d'extraction
-      des infos depuis le site. Nouvelle étape 8 « Formulaires ». Renumérotation
-      8→9 (favicon), 9→10 (analytics), 10→11 (rapport). Config : ajout de `prod_url`.
-- [x] 7. `references/report-template.md` : section formulaires
-- [x] 8. Question MCP : documenter ce que le MCP WordPress peut et ne peut pas faire
-      par rapport à WP-CLI, pour trancher la méthode
-- [x] 9. Re-packager le bundle + vérifications (lint, références croisées, intégrité)
+- [x] 1. Récupérer et analyser le guide Google (WebFetch) — recommandations, interdits,
+      et la liste de ce dont Google dit de ne pas se préoccuper
+- [x] 2. Étendre `scripts/front-audit.mjs` : canonique, meta robots/keywords/viewport, lang,
+      hreflang, tous les `Hn`, types JSON-LD, contenu mixte, dimensions naturelles vs rendues
+      des images, tous les liens avec texte et zone
+- [x] 3. `scripts/google-check.mjs` : applique les règles Google sur le rapport front,
+      interroge robots.txt et le sitemap, classe en bloquant / à corriger / à vérifier / info
+      et attribue à chaque constat sa résolution (auto / humain / question)
+- [x] 4. `references/google-seo.md` : les contrôles vérifiables, et la section « ce sur quoi
+      Google dit de ne pas perdre de temps »
+- [x] 5. `SKILL.md` : règle 4 (corriger vs demander), nouvelle étape 8, renumérotation
+      8→9 formulaires, 9→10 favicon, 10→11 analytics, 11→12 rapport
+- [x] 6. Aligner `redaction-seo-local-geo.md` sur les précisions de Google (Hn, E-E-A-T)
+- [x] 7. `references/report-template.md` : section conformité + vérifications de mise en ligne
+- [x] 8. Re-packager le bundle + vérifications
 
 ## Bilan
 
-Tout appliqué et vérifié. La skill passe de 11 à 12 étapes (0 à 11).
+La skill passe de 12 à 13 étapes (0 à 12) et de trois à quatre règles cadres.
 
-**Formulaires (nouvelle étape 8)**
-- `scripts/php/forms-audit.php` + `scripts/forms-audit.sh` : audit par **découverte de chemins
-  JSON** plutôt que par structure présumée — les noms de propriétés du FormBuilder Breakdance
-  varient selon les versions. Couvre aussi CF7 (postmeta `_mail`), WPForms (JSON du
-  `post_content`), les shortcodes posés en page, le plugin SMTP et `admin_email`.
-  Anomalies : destinataire manquant, destinataire dynamique (`[votre-email]` dans le `To`),
-  `from` non conforme ou absent, `admin_email` suspect.
-- `scripts/php/apply-forms.php` + `scripts/apply-forms.sh` : écriture au chemin JSON exact,
-  refus si le chemin n'existe pas, si la cible est une structure, ou si la valeur n'est pas une
-  adresse valide. Gère aussi CF7 et l'expéditeur global WP Mail SMTP.
-- `references/formulaires.md` : la règle (`From` = `formulaire@<domaine>`, `Reply-To` = visiteur,
-  jamais le visiteur en `From` — DMARC), la dérivation du domaine, l'ordre de correction
-  (SMTP d'abord), le test d'envoi réel, la délivrabilité, les critères d'acceptation.
-- Config : ajout de `prod_url`, sans quoi le `From` porterait le domaine du staging.
+**Règle 4 — corriger ou demander**
+« Tu corriges ce qui est corrigeable ; tu demandes ce qui te manque. » Toute correction à portée
+se fait immédiatement plutôt que d'aller dans une liste de suggestions. Trois exceptions
+seulement : textes des pages clés et légales, ce qui exige le builder ou un jugement visuel, et
+ce qui dépend d'une information absente — auquel cas la question est posée, **regroupée en une
+seule fois**, et tout ce qui n'en dépend pas continue pendant ce temps. Les deux sorties
+interdites sont nommées : inventer une valeur pour éviter de demander, ou bloquer l'étape en
+attendant une réponse.
 
-**Modules Rank Math remplis (règle + étape 6)**
-- Troisième règle qui prime : « un réglage activé n'est pas un réglage rempli ».
-- `rankmath.md` §0 : critères d'acceptation cochables pour SEO Local, Schema et LLMs.txt.
-- `scripts/site-info.mjs` : extrait du texte déjà capturé par front-audit la raison sociale, les
-  téléphones, adresses, CP/ville, SIRET, TVA, RCS, capital, horaires et emails — avec les pages
-  d'origine, le nombre d'occurrences (pages légales et contact comptées double), les **conflits**
-  NAP et les emails hors domaine.
+**Étape 8 — conformité Google**
+`google-check.mjs` contrôle : indexabilité (`noindex`, `Disallow: /`, CSS/JS bloqués, sitemap),
+URL et canoniques, doublons de title/description, titles génériques, descriptions manquantes,
+`meta keywords` à supprimer, structure des `Hn`, ancres vagues et liens vides, pages orphelines,
+liens absolus vers le staging (agrégés), images étirées ou surdimensionnées, noms de fichiers non
+parlants, HTTPS et contenu mixte, viewport, `lang`, JSON-LD invalide ou entités d'entreprise
+concurrentes. Chaque constat porte sa résolution : `auto`, `humain`, ou `question`.
+
+**La partie souvent négligée : ce que Google dit de NE PAS travailler**
+`google-seo.md` la documente avec les formulations du guide — `meta keywords` inutile, aucune
+longueur de contenu « magique », ordre des `Hn` sans effet sur le classement, mots-clés dans le
+domaine « pratiquement aucun effet », pas de pénalité pour duplication interne, et E-E-A-T qui
+n'est **pas** un facteur de classement direct. Deux passages de `redaction-seo-local-geo.md` ont
+été corrigés en conséquence : la consigne « un seul H1 » est désormais justifiée par
+l'accessibilité et non par le classement, et E-E-A-T est présenté comme un cadre d'évaluation.
 
 **Vérifications faites**
-- Logique d'audit testée sur un faux arbre Breakdance via harnais PHP : 2 formulaires détectés,
-  chemins exacts, destinataire vide et `from` de staging remontés.
-- Deux faux positifs trouvés et corrigés : `Nom <email>` (format légitime de CF7) déclaré non
-  conforme ; `[field_email]` en destinataire désormais signalé comme `destinataire_dynamique`.
-- `apply-forms` testé en dry-run et en écriture réelle : les trois refus fonctionnent, et
-  l'écriture ne touche que la feuille visée (structure et `email_to` voisins intacts).
-- `site-info.mjs` testé sur un rapport front réaliste : trois faux positifs trouvés et corrigés
-  (`00019 SIREN` pris pour un code postal, `RCS Lyon Téléphone`, mot « capital » dans la valeur).
-  Le téléphone divergent entre pied de page et mentions légales est bien remonté en conflit,
-  l'email d'agence bien signalé.
-- **Bug de portabilité corrigé** : `${host,,}` exigeait bash 4, or macOS livre bash 3.2
-  (vérifié : 3.2.57). Remplacé par `tr`. Dérivation du domaine testée sur 9 URL réelles.
-- Piège identifié et traité : un staging du type `client.werocket.ovh` dérivait
-  `formulaire@werocket.ovh`, l'adresse de l'agence. Avertissement explicite ajouté.
-- Numérotation de `schema.md` alignée sur la convention `## N.` ; les 9 renvois `fichier.md §N`
-  vérifiés programmatiquement, tous valides.
-- Lint complet (8 shell, 7 PHP, 2 mjs), 20 fichiers cités tous présents, bundle ré-extrait
-  identique à la source, `SKILL.md` synchronisé.
-
-**Question MCP — répondu dans la skill**
-Le MCP configuré sur les sites est `@automattic/mcp-wordpress-remote` (MCP WordPress générique
-via le plugin MCP Adapter), pas un MCP Breakdance. Il passe par la REST API, donc il ne peut pas
-remplacer WP-CLI pour cette procédure : `breakdance_data` est une postmeta non exposée en REST,
-les options Rank Math sont sérialisées et s'écrivent clé par clé avec `wp option patch`, et
-l'export de base de l'étape 0 n'a pas d'équivalent. Documenté en tête de `SKILL.md` comme
-complément d'exploration, WP-CLI restant la voie d'écriture.
+- Extraction des types JSON-LD testée sur un `@graph` Rank Math réaliste avec `@type` multiples
+  et entités imbriquées : les six types sont bien remontés.
+- `google-check.mjs` exécuté contre un faux site servi en local (robots.txt avec
+  `Disallow: /wp-content/`, sitemap sur un autre domaine, page en `noindex`, titles en doublon,
+  `meta keywords`, ancre « En savoir plus », lien `#`, image 400px étirée sur 1200px, contenu
+  mixte, viewport et `lang` absents) : 27 constats, tous justes.
+- **Deux bugs trouvés et corrigés à ce test** : les liens internes du staging produisaient un
+  constat par lien (inexploitable sur un vrai site, un menu en génère des centaines) — désormais
+  agrégés en un seul constat avec le compte ; et l'URL du sitemap déclarée dans robots.txt était
+  mal ramenée sur le site audité, ce qui la faisait passer pour injoignable.
+- Lint complet (8 shell, 7 PHP, 3 mjs), 22 fichiers cités tous présents, 11 renvois `§N`
+  vérifiés, `description` du frontmatter ramenée sous la limite (969 caractères après un premier
+  jet à 1031), bundle ré-extrait identique à la source.
 
 **Non vérifié**
-Les scripts n'ont pas tourné contre un WordPress réel : aucun site joignable dans cette session,
-et les MCP WordPress ne sont configurés que sur les projets de site, pas sur ce starter. Les
-structures dépendantes du site (arbre du FormBuilder Breakdance, clés WPForms/FluentSMTP) sont
-donc traitées par découverte plutôt que par constante, mais restent à confirmer au premier
-passage client.
+`google-check.mjs` n'a pas tourné contre un vrai site WordPress : les seuils (image étirée à 80 %,
+page pauvre à 200 caractères) sont raisonnés, pas calibrés sur du réel. À ajuster au premier
+passage client si le bruit est trop élevé.

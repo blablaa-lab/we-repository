@@ -1,6 +1,6 @@
 ---
 name: we-finalise
-description: Procédure Werocket de finalisation d'un site WordPress + Breakdance avant mise en ligne, via WP-CLI en SSH et Playwright. Couvre cookies (werocket tools), liens réseaux sociaux, alt/légendes/descriptions de la médiathèque, responsive, metas Rank Math, SEO local, GEO, modules Rank Math remplis (Local SEO, Schema/données structurées JSON-LD par CPT, robots.txt, llms.txt), vérification des formulaires (destinataire présent, expéditeur formulaire@domaine), favicon, Independent Analytics, et produit un rapport de finalisation. Utilise cette skill dès que l'utilisateur parle de finaliser, livrer, mettre en ligne, préparer la mise en prod, faire la checklist de fin de projet, « passer we-finalise », ou demande une seule de ces étapes (alt des images, metas Rank Math, données structurées / schema / rich results, formulaires et emails d'envoi, favicon, responsive check, SEO local) sur un site Werocket — même s'il ne prononce pas le mot « finalisation ».
+description: Procédure Werocket de finalisation d'un site WordPress + Breakdance avant mise en ligne, via WP-CLI en SSH et Playwright. Couvre cookies (werocket tools), liens réseaux sociaux, alt et légendes des médias, responsive, metas Rank Math, SEO local, GEO, modules Rank Math remplis (Local SEO, Schema/données structurées JSON-LD par CPT, robots.txt, llms.txt), conformité aux recommandations SEO de Google (indexabilité, canoniques, titles, ancres, images, HTTPS, mobile), vérification des formulaires (destinataire, expéditeur formulaire@domaine), favicon, Independent Analytics, et produit un rapport de finalisation. Utilise cette skill dès que l'utilisateur parle de finaliser, livrer, mettre en ligne, préparer la mise en prod, faire la checklist de fin de projet, « passer we-finalise », ou demande une seule de ces étapes (alt des images, metas Rank Math, données structurées, recommandations Google, formulaires, favicon, responsive, SEO local) sur un site Werocket.
 ---
 
 # we-finalise — finalisation d'un site Werocket
@@ -11,11 +11,12 @@ Accès au site : **WP-CLI via SSH** (alias `wp @<alias>`) pour tout ce qui est d
 
 **Si un serveur MCP WordPress est branché sur le site**, il ne remplace pas WP-CLI ici. Ce type de serveur (par exemple `@automattic/mcp-wordpress-remote` sur le plugin MCP Adapter) passe par la REST API : il lit et écrit très bien les contenus, les médias et leurs champs, ce qui en fait un bon complément pour inspecter le site sans SSH. Mais cette procédure repose sur trois choses hors de portée de la REST API : la postmeta `breakdance_data` (non exposée), les options sérialisées de Rank Math (`rank-math-options-*`, écrites clé par clé avec `wp option patch`), et l'export de base de données de l'étape 0. Utilise-le donc pour explorer ou vérifier, garde WP-CLI pour tout ce qui écrit. Vérifie ce que le serveur expose réellement avant de t'appuyer dessus : cela dépend du plugin installé côté site.
 
-## Trois règles qui priment sur tout le reste
+## Quatre règles qui priment sur tout le reste
 
 1. **Le contenu visible n'est pas ta propriété.** Les métadonnées invisibles (alt, légendes, descriptions médias, meta title/description, réglages plugins, favicon) s'appliquent directement. Les textes visibles s'appliquent directement **sauf** sur les pages clés listées dans la config (`key_pages`) et jamais sur les pages légales : là, tu proposes dans le rapport, tu ne modifies pas. Pourquoi : un client qui découvre ses textes réécrits au lancement, c'est un ticket, pas de la valeur.
 2. **Un site Breakdance ne stocke pas ses textes dans `post_content`.** Les pages Breakdance ont leur contenu dans la postmeta `breakdance_data` (JSON). Toute modification de texte passe par `scripts/bd-text-replace.sh` (remplacement exact dans l'arbre JSON), jamais par `wp post update --post_content` et jamais par `wp search-replace` (l'échappement JSON ferait rater les occurrences). Tu ne changes que du texte, jamais la structure des éléments. Les **propriétés** de l'arbre qui ne sont pas du texte visible (adresses email d'un formulaire, par exemple) se corrigent par chemin JSON avec `scripts/apply-forms.sh`, pas par remplacement de texte.
 3. **Un réglage activé n'est pas un réglage rempli.** Les trois modules Rank Math — SEO Local, Schema (données structurées), LLMs.txt — ne sont « faits » que quand leurs champs sont renseignés et vérifiés sur le rendu, pas quand la case est cochée. Un module à moitié rempli est pire qu'absent : il publie des données incomplètes que Google enregistre. Les critères d'acceptation des trois sont dans `references/rankmath.md` §0. Les valeurs se trouvent **dans le site** (`scripts/site-info.mjs` : mentions légales, contact, pied de page) ; ce qui reste introuvable se demande au client et s'inscrit dans le rapport, jamais ne s'invente.
+4. **Tu corriges ce qui est corrigeable ; tu demandes ce qui te manque.** Dès qu'une correction est à ta portée avec les informations dont tu disposes, fais-la — ne la reporte pas dans une liste de suggestions. Trois exceptions, et trois seulement : les textes des pages clés et légales (règle 1), ce qui exige le builder ou un jugement visuel (structure, qualité d'image, responsive), et ce qui dépend d'une information que tu n'as pas. Dans ce dernier cas, **pose la question** — regroupée avec les autres, en une seule fois, pas au compte-gouttes — et continue tout ce qui n'en dépend pas pendant ce temps. Ce qui est interdit, c'est de choisir entre les deux mauvaises sorties : inventer une valeur pour éviter de demander, ou bloquer toute l'étape en attendant une réponse.
 
 ## Étape 0 — Intake et sauvegarde
 
@@ -98,7 +99,10 @@ Prérequis : `npm i -D playwright && npx playwright install chromium` dans le pr
 - `images` : chaque `<img>` rendu avec `src`, `alt`, et `alt_mismatch: true` quand l'alt rendu diffère de celui de la médiathèque (Breakdance a un alt personnalisé ou vide sur l'élément) ;
 - `social_links` : tous les liens vers facebook/instagram/linkedin/tiktok/youtube/x, avec leur emplacement (header/footer/contenu) ;
 - `favicon` : présence de `<link rel="icon">` et code HTTP de son URL ;
-- `head` : title et meta description rendus.
+- `head` : title, meta description, canonique, `meta robots`, `meta keywords`, viewport, langue, hreflang et ressources en contenu mixte ;
+- `headings` : tous les `Hn` dans l'ordre du document ; `schema_types` : les types JSON-LD émis par la page ; `links` : tous les liens avec leur texte et leur zone.
+
+Ces trois dernières collectes alimentent l'étape 8 : ne saute pas cette étape si tu comptes contrôler la conformité Google.
 
 Ensuite : **regarde les screenshots**, breakpoint par breakpoint, pas seulement le JSON. Un `overflow: false` n'exclut pas un texte tronqué, une image écrasée ou un menu illisible. Note chaque problème visuel avec page + breakpoint + description précise. Ces corrections se font dans Breakdance par un humain : elles vont dans le rapport, section « À corriger dans Breakdance », pas dans une modification automatique.
 
@@ -189,7 +193,52 @@ Reporte le sous-type retenu, le mapping CPT → schema appliqué, et surtout ce 
 **volontairement laissé de côté** faute de données (avis, tarifs, horaires) : cette liste est ce
 que le client doit fournir pour aller plus loin.
 
-## Étape 8 — Formulaires : destinataire et expéditeur
+## Étape 8 — Conformité aux recommandations Google
+
+Lis `references/google-seo.md`. C'est le contrôle qui reprend le guide de démarrage SEO de Google
+sur ce qui est vérifiable à la livraison : indexabilité, URL et canoniques, titles et descriptions,
+textes d'ancrage, images, HTTPS, mobile, données structurées.
+
+```bash
+node scripts/google-check.mjs --site https://staging.client.fr --prod https://www.client.fr
+# vérifier aussi le statut HTTP des liens internes (plus lent) : --links
+```
+
+Le script s'appuie sur `.we-finalise/front/report.json` (étape 4) et interroge `robots.txt` et le
+sitemap. Il écrit `.we-finalise/google-check.json` et classe chaque constat en `bloquant`,
+`à corriger`, `à vérifier`, `info` — avec, pour chacun, **la façon de le résoudre** :
+
+- `auto` → tu le corriges maintenant, avec les scripts de la skill (metas, canonique, robots.txt,
+  alt, contenu mixte, ancres) ;
+- `humain` → builder ou jugement visuel (structure de titres, image floue, lien vide, débordement) →
+  section « À corriger dans Breakdance » du rapport ;
+- `question` → il manque une information que seul le client détient → tu la demandes (règle 4).
+
+Traite les `bloquant` d'abord et signale-les tout de suite : un `Disallow: /` résiduel, un `noindex`
+sur une page à indexer, un site encore en `http://` ou sans `meta viewport` annulent le reste du
+travail. Le piège le plus fréquent et le moins visible : un `Disallow: /wp-content/` hérité du
+développement — Google ne peut alors ni charger le CSS ni le JS, donc ne voit pas les pages comme
+un visiteur.
+
+Deux points demandent ton jugement plutôt que le script :
+
+- **Publicités et interstitiels** : regarde les captures de l'étape 4. Un pop-up qui couvre le
+  contenu à l'arrivée est explicitement déconseillé par Google. Cookies compris : le bandeau doit
+  rester utilisable et ne pas masquer la page (étape 2).
+- **Originalité du contenu** : un texte recopié d'un autre site — y compris d'un concurrent du même
+  secteur, y compris fourni par le client — est le seul cas de duplication qui compte vraiment.
+  Si tu as un doute sur un paragraphe, signale-le plutôt que de le réécrire.
+
+Ce que le script ne peut pas juger et qui va au rapport : Search Console à créer et sitemap à
+soumettre **après** la mise en ligne sur le domaine de production, performances réelles, et la
+promotion du site (réseaux, newsletter, supports imprimés).
+
+Enfin, ne perds pas de temps — et ne le facture pas — sur ce que Google dit explicitement de ne pas
+travailler : `meta keywords`, longueur « idéale » du contenu, ordre des `Hn` pour le classement,
+mots-clés dans le domaine, contenu dupliqué interne présenté comme une pénalité, E-E-A-T présenté
+comme un facteur de classement. La liste et les formulations exactes sont dans `google-seo.md`.
+
+## Étape 9 — Formulaires : destinataire et expéditeur
 
 Lis `references/formulaires.md`. Un formulaire cassé ne se voit pas : le visiteur envoie, la page
 affiche « merci », personne ne reçoit rien — et le client perd des clients sans le savoir. Deux
@@ -257,20 +306,20 @@ script : il se règle par le plugin SMTP (point 1) ou dans le builder — dans c
 Un formulaire sans destinataire est un bloquant : signale-le à l'utilisateur dès que tu le trouves,
 sans attendre le rapport final.
 
-## Étape 9 — Favicon
+## Étape 10 — Favicon
 
 Si `front/report.json` indique un favicon présent et fonctionnel (HTTP 200) et que `site_icon` est défini dans `urls.json → _meta`, passe. Sinon : `scripts/make-favicon.sh @staging <logo_source>` génère `.we-finalise/favicon-512.png` à partir du logo. **Regarde le PNG.** S'il est lisible, relance avec `--apply` : import en médiathèque et `site_icon`. Le logo source vient de `logo_source` dans la config, sinon de `wp theme mod get custom_logo`, sinon de l'image du header Breakdance (voir `references/breakdance.md`). Un logotype horizontal réduit en carré est illisible : dans ce cas, isole le symbole si le logo en a un, sinon signale dans le rapport qu'un favicon dédié est à demander au client — ne mets pas un favicon moche en prod.
 
-## Étape 10 — Independent Analytics
+## Étape 11 — Independent Analytics
 
 `wp plugin list` : si `independent-analytics` est absent, `wp plugin install independent-analytics --activate` ; s'il est inactif, active-le. Puis autorise le rôle Éditeur à voir les statistiques : l'option est dans les réglages du plugin ; découvre sa clé avec `wp option list --search='iawp*'` (cherche une option contenant `role`, `permission` ou `access`), lis sa valeur, ajoute `editor`, réécris-la. Documente la clé trouvée dans `references/independent-analytics.md`.
 
-## Étape 11 — Rapport
+## Étape 12 — Rapport
 
 Génère `we-finalise-report.md` à la racine du projet à partir de `references/report-template.md`. Le rapport est le livrable : il liste ce qui a été vérifié, ce qui a été modifié (avec compte et exemples), ce qui reste à faire par un humain dans Breakdance, et les propositions de contenu en attente de validation client. Termine par les bloquants éventuels (plugin manquant, `blog_public` à 0, favicon à demander).
 
 ## Ordre et interruptions
 
-Les étapes 1 → 11 s'enchaînent. Dépendances : l'étape 4 a besoin de 1 et 3 (comparaison des alt) ; l'étape 6 a besoin du texte capturé en 4 (`site-info.mjs`) ; l'étape 7 a besoin de l'inventaire des post types (1) et de la fiche Local SEO (6) ; l'étape 8 a besoin de `prod_url` (0). Si l'utilisateur demande une seule étape (« fais juste les metas Rank Math »), fais l'intake minimal nécessaire (config + backup), l'inventaire, l'étape demandée, et un rapport réduit à cette étape. Ne saute jamais le backup.
+Les étapes 1 → 12 s'enchaînent. Dépendances : l'étape 4 a besoin de 1 et 3 (comparaison des alt) ; l'étape 6 a besoin du texte capturé en 4 (`site-info.mjs`) ; l'étape 7 a besoin de l'inventaire des post types (1) et de la fiche Local SEO (6) ; l'étape 8 a besoin du rapport front (4) et des étapes 5 à 7 faites, puisqu'elle les contrôle ; l'étape 9 a besoin de `prod_url` (0). Si l'utilisateur demande une seule étape (« fais juste les metas Rank Math »), fais l'intake minimal nécessaire (config + backup), l'inventaire, l'étape demandée, et un rapport réduit à cette étape. Ne saute jamais le backup.
 
 Quand une commande échoue en SSH (timeout, permissions), ne contourne pas en supposant le résultat : signale, propose la correction d'accès, et marque l'étape « non vérifiée » dans le rapport.
