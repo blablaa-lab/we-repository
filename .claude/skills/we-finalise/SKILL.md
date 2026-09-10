@@ -1,18 +1,21 @@
 ---
 name: we-finalise
-description: Procédure Werocket de finalisation d'un site WordPress + Breakdance avant mise en ligne, exécutée via WP-CLI en SSH et Playwright. Couvre cookies (werocket tools), liens réseaux sociaux, alt/légendes/descriptions de la médiathèque, cohérence des alt côté Breakdance, responsive, meta title/description Rank Math, SEO local, GEO, modules Rank Math (Local SEO, Schema/données structurées, robots.txt, llms.txt), données structurées JSON-LD adaptées aux CPT et au secteur du site, favicon, Independent Analytics, et produit un rapport de finalisation. Utilise cette skill dès que l'utilisateur parle de finaliser, livrer, mettre en ligne, préparer la mise en prod, faire la checklist de fin de projet, "passer we-finalise", ou demande une seule de ces étapes (alt des images, meta Rank Math, données structurées / schema / rich results, favicon, responsive check, SEO local) sur un site Werocket — même s'il ne prononce pas le mot "finalisation".
+description: Procédure Werocket de finalisation d'un site WordPress + Breakdance avant mise en ligne, via WP-CLI en SSH et Playwright. Couvre cookies (werocket tools), liens réseaux sociaux, alt/légendes/descriptions de la médiathèque, responsive, metas Rank Math, SEO local, GEO, modules Rank Math remplis (Local SEO, Schema/données structurées JSON-LD par CPT, robots.txt, llms.txt), vérification des formulaires (destinataire présent, expéditeur formulaire@domaine), favicon, Independent Analytics, et produit un rapport de finalisation. Utilise cette skill dès que l'utilisateur parle de finaliser, livrer, mettre en ligne, préparer la mise en prod, faire la checklist de fin de projet, « passer we-finalise », ou demande une seule de ces étapes (alt des images, metas Rank Math, données structurées / schema / rich results, formulaires et emails d'envoi, favicon, responsive check, SEO local) sur un site Werocket — même s'il ne prononce pas le mot « finalisation ».
 ---
 
 # we-finalise — finalisation d'un site Werocket
 
 Tu exécutes la checklist de fin de projet Werocket sur un site WordPress construit avec Breakdance. L'objectif : un site propre, techniquement prêt et correctement optimisé pour le SEO local, sans casser un contenu que le client a validé.
 
-Accès au site : **WP-CLI via SSH uniquement** (alias `wp @<alias>`) pour tout ce qui est données et réglages, et **Playwright en local** pour tout ce qui doit être vu côté front (responsive, alt rendus, liens sociaux, favicon). Pas d'admin WP en navigateur.
+Accès au site : **WP-CLI via SSH** (alias `wp @<alias>`) pour tout ce qui est données et réglages, et **Playwright en local** pour tout ce qui doit être vu côté front (responsive, alt rendus, liens sociaux, favicon). Pas d'admin WP en navigateur.
 
-## Deux règles qui priment sur tout le reste
+**Si un serveur MCP WordPress est branché sur le site**, il ne remplace pas WP-CLI ici. Ce type de serveur (par exemple `@automattic/mcp-wordpress-remote` sur le plugin MCP Adapter) passe par la REST API : il lit et écrit très bien les contenus, les médias et leurs champs, ce qui en fait un bon complément pour inspecter le site sans SSH. Mais cette procédure repose sur trois choses hors de portée de la REST API : la postmeta `breakdance_data` (non exposée), les options sérialisées de Rank Math (`rank-math-options-*`, écrites clé par clé avec `wp option patch`), et l'export de base de données de l'étape 0. Utilise-le donc pour explorer ou vérifier, garde WP-CLI pour tout ce qui écrit. Vérifie ce que le serveur expose réellement avant de t'appuyer dessus : cela dépend du plugin installé côté site.
+
+## Trois règles qui priment sur tout le reste
 
 1. **Le contenu visible n'est pas ta propriété.** Les métadonnées invisibles (alt, légendes, descriptions médias, meta title/description, réglages plugins, favicon) s'appliquent directement. Les textes visibles s'appliquent directement **sauf** sur les pages clés listées dans la config (`key_pages`) et jamais sur les pages légales : là, tu proposes dans le rapport, tu ne modifies pas. Pourquoi : un client qui découvre ses textes réécrits au lancement, c'est un ticket, pas de la valeur.
-2. **Un site Breakdance ne stocke pas ses textes dans `post_content`.** Les pages Breakdance ont leur contenu dans la postmeta `breakdance_data` (JSON). Toute modification de texte passe par `scripts/bd-text-replace.sh` (remplacement exact dans l'arbre JSON), jamais par `wp post update --post_content` et jamais par `wp search-replace` (l'échappement JSON ferait rater les occurrences). Tu ne changes que du texte, jamais la structure des éléments.
+2. **Un site Breakdance ne stocke pas ses textes dans `post_content`.** Les pages Breakdance ont leur contenu dans la postmeta `breakdance_data` (JSON). Toute modification de texte passe par `scripts/bd-text-replace.sh` (remplacement exact dans l'arbre JSON), jamais par `wp post update --post_content` et jamais par `wp search-replace` (l'échappement JSON ferait rater les occurrences). Tu ne changes que du texte, jamais la structure des éléments. Les **propriétés** de l'arbre qui ne sont pas du texte visible (adresses email d'un formulaire, par exemple) se corrigent par chemin JSON avec `scripts/apply-forms.sh`, pas par remplacement de texte.
+3. **Un réglage activé n'est pas un réglage rempli.** Les trois modules Rank Math — SEO Local, Schema (données structurées), LLMs.txt — ne sont « faits » que quand leurs champs sont renseignés et vérifiés sur le rendu, pas quand la case est cochée. Un module à moitié rempli est pire qu'absent : il publie des données incomplètes que Google enregistre. Les critères d'acceptation des trois sont dans `references/rankmath.md` §0. Les valeurs se trouvent **dans le site** (`scripts/site-info.mjs` : mentions légales, contact, pied de page) ; ce qui reste introuvable se demande au client et s'inscrit dans le rapport, jamais ne s'invente.
 
 ## Étape 0 — Intake et sauvegarde
 
@@ -22,6 +25,7 @@ Cherche `we-finalise.json` à la racine du projet. S'il n'existe pas, pose les q
 {
   "wp_alias": "@staging",
   "site_url": "https://staging.client.fr",
+  "prod_url": "https://www.client.fr",
   "client": {
     "name": "Nom commercial",
     "legal_name": "Raison sociale",
@@ -49,6 +53,8 @@ Cherche `we-finalise.json` à la racine du projet. S'il n'existe pas, pose les q
 @staging:
   ssh: user@host/chemin/vers/wordpress
 ```
+
+`prod_url` est l'URL du site **en production** : c'est d'elle que sont dérivés l'adresse expéditeur des formulaires (`formulaire@<domaine>`, étape 8) et les URL du schema. Sans elle, ces valeurs porteraient le domaine du staging. Demande-la si elle n'est pas connue.
 
 Vérifie la connexion : `wp @staging option get blogname`. `business_type` est un type Schema.org accepté par Rank Math (voir `references/rankmath.md`). Prérequis locaux : `wp`, `jq`, `node` ≥ 18, ImageMagick (favicon), Playwright (étape 4).
 
@@ -115,7 +121,23 @@ Après toute écriture dans `breakdance_data` : `wp @staging cache flush` puis p
 
 ## Étape 6 — Modules Rank Math
 
-Suis `references/rankmath.md` pas à pas. Résumé :
+Commence par **trouver les informations dans le site** — elles y sont presque toujours :
+
+```bash
+node scripts/site-info.mjs --domain client.fr    # → .we-finalise/site-info.json
+```
+
+À partir du texte des pages capturé à l'étape 4, il extrait raison sociale, téléphones, adresses,
+code postal et ville, SIRET, TVA, RCS, capital, horaires et emails, en donnant pour chacun les
+pages où il apparaît et son nombre d'occurrences — les pages légales et contact comptant double.
+Il signale surtout les **incohérences** : deux téléphones différents entre le pied de page et les
+mentions légales, une adresse qui varie, un email d'agence resté en place. Tranche-les avant
+d'écrire la fiche : c'est la cohérence NAP qui est en jeu. Une donnée introuvable se demande au
+client et va au rapport — elle ne s'invente pas, et un champ vide vaut mieux qu'un champ faux.
+
+Complète `we-finalise.json → client` avec ce qui a été confirmé, puis suis `references/rankmath.md`
+pas à pas — les critères qui font qu'un module est *rempli* et pas seulement *activé* sont dans sa
+§0. Résumé :
 
 - Mode avancé activé (sinon les modules n'apparaissent pas).
 - Module **Schema (Structured Data)** activé — slug `rich-snippet`. L'activation et la configuration par CPT sont l'étape 7 ; ici, vérifie seulement qu'il est dans `rank_math_modules`.
@@ -167,20 +189,88 @@ Reporte le sous-type retenu, le mapping CPT → schema appliqué, et surtout ce 
 **volontairement laissé de côté** faute de données (avis, tarifs, horaires) : cette liste est ce
 que le client doit fournir pour aller plus loin.
 
-## Étape 8 — Favicon
+## Étape 8 — Formulaires : destinataire et expéditeur
+
+Lis `references/formulaires.md`. Un formulaire cassé ne se voit pas : le visiteur envoie, la page
+affiche « merci », personne ne reçoit rien — et le client perd des clients sans le savoir. Deux
+contrôles ne se négocient pas : **il y a un destinataire**, et **le `From` est
+`formulaire@<domaine de prod>`**.
+
+```bash
+scripts/forms-audit.sh @staging                 # domaine dérivé de prod_url
+scripts/forms-audit.sh @staging --domain client.fr   # ou imposé
+```
+
+L'audit (`.we-finalise/forms.json`) couvre les formulaires du FormBuilder Breakdance, les plugins
+de formulaires actifs (Contact Form 7 et WPForms sont lus ; les autres sont signalés à vérifier à
+la main), les shortcodes posés dans les pages, le plugin SMTP et son expéditeur, et
+`admin_email`. Les noms de propriétés du FormBuilder variant selon les versions, l'audit remonte le
+**chemin JSON** de chaque valeur : c'est ce chemin que tu recopies pour corriger.
+
+Anomalies remontées, toutes bloquantes sauf mention contraire :
+
+- `destinataire_manquant` — les messages sont perdus ;
+- `destinataire_dynamique` — le `To` est construit sur un champ du visiteur : le message part au
+  visiteur, pas au client ;
+- `from_non_conforme` / `from_absent` — mauvais domaine expéditeur, donc spam ou rejet DMARC ;
+- `admin_email_suspect` — adresse d'agence ou de staging restée en place.
+
+Le domaine se dérive de `prod_url`, jamais du staging. Si le staging est hébergé sur un
+sous-domaine de l'hébergeur ou de l'agence, le script avertit : renseigne `prod_url` plutôt que
+d'accepter le domaine dérivé, sinon tu écris l'adresse de quelqu'un d'autre.
+
+Corriger, dans cet ordre (le détail est dans la référence) :
+
+1. **Le plugin SMTP d'abord** : `from_email` = `formulaire@<domaine>` + « Force From Email » couvre
+   tout le site d'un coup. Pas de plugin SMTP actif = bloquant à signaler (les mails partent par
+   `mail()`, délivrabilité faible).
+2. **Puis chaque formulaire**, pour que rien ne contredise le réglage global. Écris
+   `.we-finalise/forms-updates.json` en recopiant les chemins de l'audit :
+
+```json
+{
+  "smtp": { "from_email": "formulaire@client.fr", "from_name": "Cabinet X", "force": true },
+  "breakdance": [
+    { "post_id": 42, "path": "root.children.0…actions.0.email_from", "value": "formulaire@client.fr" },
+    { "post_id": 42, "path": "root.children.0…actions.0.email_to", "value": "contact@client.fr" }
+  ],
+  "cf7": [ { "form_id": 5, "recipient": "contact@client.fr", "sender": "Cabinet X <formulaire@client.fr>" } ]
+}
+```
+
+```bash
+scripts/apply-forms.sh @staging .we-finalise/forms-updates.json --dry-run
+scripts/apply-forms.sh @staging .we-finalise/forms-updates.json
+```
+
+Le script refuse un chemin inexistant, une cible qui est une structure et non une valeur, et toute
+valeur qui n'est pas une adresse email valide. Un `from` **absent** de l'arbre ne se crée pas par
+script : il se règle par le plugin SMTP (point 1) ou dans le builder — dans ce cas, rapport.
+
+3. **Tester pour de vrai.** La configuration en base ne prouve pas qu'un mail arrive. Envoie un
+   message depuis le front avec une adresse réelle, vérifie la réception, vérifie que « répondre »
+   part vers l'adresse du visiteur (`Reply-To`), et regarde l'en-tête `From` du message reçu. Si tu
+   n'as pas accès à la boîte du client, note « à confirmer par le client » — **pas** « vérifié ».
+   Sur un staging, l'envoi peut être bloqué : refaire le test après mise en ligne, et l'inscrire
+   dans les vérifications de mise en ligne du rapport.
+
+Un formulaire sans destinataire est un bloquant : signale-le à l'utilisateur dès que tu le trouves,
+sans attendre le rapport final.
+
+## Étape 9 — Favicon
 
 Si `front/report.json` indique un favicon présent et fonctionnel (HTTP 200) et que `site_icon` est défini dans `urls.json → _meta`, passe. Sinon : `scripts/make-favicon.sh @staging <logo_source>` génère `.we-finalise/favicon-512.png` à partir du logo. **Regarde le PNG.** S'il est lisible, relance avec `--apply` : import en médiathèque et `site_icon`. Le logo source vient de `logo_source` dans la config, sinon de `wp theme mod get custom_logo`, sinon de l'image du header Breakdance (voir `references/breakdance.md`). Un logotype horizontal réduit en carré est illisible : dans ce cas, isole le symbole si le logo en a un, sinon signale dans le rapport qu'un favicon dédié est à demander au client — ne mets pas un favicon moche en prod.
 
-## Étape 9 — Independent Analytics
+## Étape 10 — Independent Analytics
 
 `wp plugin list` : si `independent-analytics` est absent, `wp plugin install independent-analytics --activate` ; s'il est inactif, active-le. Puis autorise le rôle Éditeur à voir les statistiques : l'option est dans les réglages du plugin ; découvre sa clé avec `wp option list --search='iawp*'` (cherche une option contenant `role`, `permission` ou `access`), lis sa valeur, ajoute `editor`, réécris-la. Documente la clé trouvée dans `references/independent-analytics.md`.
 
-## Étape 10 — Rapport
+## Étape 11 — Rapport
 
 Génère `we-finalise-report.md` à la racine du projet à partir de `references/report-template.md`. Le rapport est le livrable : il liste ce qui a été vérifié, ce qui a été modifié (avec compte et exemples), ce qui reste à faire par un humain dans Breakdance, et les propositions de contenu en attente de validation client. Termine par les bloquants éventuels (plugin manquant, `blog_public` à 0, favicon à demander).
 
 ## Ordre et interruptions
 
-Les étapes 1 → 10 s'enchaînent ; l'étape 4 dépend de 1 et 3 (comparaison des alt), et l'étape 7 de l'inventaire des post types (étape 1) et de la fiche Local SEO (étape 6). Si l'utilisateur demande une seule étape (« fais juste les metas Rank Math »), fais l'intake minimal nécessaire (config + backup), l'inventaire, l'étape demandée, et un rapport réduit à cette étape. Ne saute jamais le backup.
+Les étapes 1 → 11 s'enchaînent. Dépendances : l'étape 4 a besoin de 1 et 3 (comparaison des alt) ; l'étape 6 a besoin du texte capturé en 4 (`site-info.mjs`) ; l'étape 7 a besoin de l'inventaire des post types (1) et de la fiche Local SEO (6) ; l'étape 8 a besoin de `prod_url` (0). Si l'utilisateur demande une seule étape (« fais juste les metas Rank Math »), fais l'intake minimal nécessaire (config + backup), l'inventaire, l'étape demandée, et un rapport réduit à cette étape. Ne saute jamais le backup.
 
 Quand une commande échoue en SSH (timeout, permissions), ne contourne pas en supposant le résultat : signale, propose la correction d'accès, et marque l'étape « non vérifiée » dans le rapport.
