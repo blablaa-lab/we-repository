@@ -1,6 +1,6 @@
-# Blablaa — Starter Project
+# We-repository
 
-Ce repo est mon starter project personnel, conçu pour initialiser n'importe quel nouveau projet rapidement et avec les bonnes bases.
+Ce repo est mon dépôt de base personnel, conçu pour initialiser n'importe quel nouveau projet rapidement et avec les bonnes bases.
 
 ## Ce qu'il contient
 
@@ -21,9 +21,9 @@ Deux fichiers côte à côte dans `.claude/skills/we-finalise/` :
 
 ## Utilisation
 
-Cloner ce repo comme point de départ pour un nouveau projet, puis :
+Cloner `we-repository` comme point de départ pour un nouveau projet, puis :
 
 1. Mettre à jour ce README avec le contexte du nouveau projet
 2. Compléter le CLAUDE.md avec les commandes de build/test/lint une fois le stack choisi
 3. Remplir `_docs/prd.md` et `_docs/architecture.md`
-4. Vider `_tasks/todo.md` (il contient la dernière tâche du starter) et y planifier les premières étapes
+4. Vider `_tasks/todo.md` (il contient la dernière tâche du dépôt de base) et y planifier les premières étapes
