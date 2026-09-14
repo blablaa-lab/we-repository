@@ -19,8 +19,6 @@ _tasks/
   todo.md                          Plan cochable de la tâche en cours + bilan
   lessons.md                       Leçons tirées des erreurs réellement commises
 .claude/
-  commands/
-    session-end.md                 Commande /session-end
   skills/
     we-finalise/
       SKILL.md                     La procédure — le fichier chargé par Claude Code
@@ -41,10 +39,9 @@ _tasks/
 
 ### Dans Claude Code
 
-| Commande | Effet |
-|---|---|
-| `/we-finalise` | Lance la procédure de finalisation (voir plus bas). Se déclenche aussi sur « finaliser », « mettre en ligne », « checklist de fin de projet », ou une étape isolée (« fais juste les metas Rank Math »). |
-| `/session-end` | Clôture la session : résumé, leçons ajoutées à `_tasks/lessons.md`, tâches cochées dans `_tasks/todo.md`. |
+`/we-finalise` lance la procédure de finalisation, documentée plus bas. Elle se déclenche aussi sans
+la commande, dès qu'il est question de « finaliser », « livrer », « mettre en ligne », « faire la
+checklist de fin de projet », ou d'une étape isolée (« fais juste les metas Rank Math »).
 
 ### Maintenance du bundle de la skill
 
