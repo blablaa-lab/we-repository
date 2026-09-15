@@ -34,8 +34,38 @@ Règles tirées d'erreurs réellement commises. À relire en début de session.
 
 ## Skills packagées
 
-- `SKILL.md` et le bundle `.skill` (zip) contiennent le même fichier : après toute modification,
-  re-zipper **et** recopier le `SKILL.md` à côté, puis vérifier par `diff` que les deux sont
-  identiques. Sinon la procédure chargée et les scripts livrés divergent silencieusement.
+- **Les sources ne doivent jamais vivre uniquement dans le bundle.** Tant que `references/` et
+  `scripts/` n'existaient que dans le zip, le `SKILL.md` chargé par Claude Code en était une copie
+  à recopier à la main : les deux divergeaient en silence. Corrigé structurellement — l'arborescence
+  `.claude/skills/we-finalise/` est la source, et `./package-skill.sh` produit le bundle après
+  vérification, en refusant de l'écrire s'il ne correspond pas aux sources. Un invariant tenu par
+  un script vaut mieux qu'une consigne de vigilance.
 - Après une renumérotation de sections, vérifier programmatiquement tous les renvois
-  `fichier.md §N` : un renvoi cassé est invisible à la relecture.
+  `fichier.md §N` : un renvoi cassé est invisible à la relecture. `package-skill.sh` le fait.
+
+## Ne pas documenter l'incapacité d'un canal sans l'avoir interrogé
+
+- `SKILL.md` affirmait noir sur blanc qu'un serveur MCP WordPress ne pouvait pas remplacer WP-CLI
+  pour trois choses (postmeta `breakdance_data`, options sérialisées Rank Math, export de base),
+  « puisqu'il passe par la REST API ». **Deux des trois étaient fausses** : le serveur exposait
+  134 abilities, dont `breakdance/get-post-tree`, `breakdance/edit-post` et surtout
+  `agent-connector-for-wp/php-eval`, qui exécute du PHP dans le WordPress chargé. L'affirmation
+  avait été déduite de la *catégorie* de l'outil (« c'est de la REST API ») au lieu d'être mesurée.
+  **Règle : avant d'écrire qu'un canal ne sait pas faire quelque chose, appeler `tools/list` et
+  `discover-abilities` et lire la réponse.** Le coût de la vérification était de deux minutes ;
+  celui de l'erreur, une procédure entière bâtie sur du SSH inutile.
+- Le corollaire tient aussi : ce qu'un catalogue annonce n'est pas ce que l'hôte permet. L'ability
+  `wp-cli` existait mais le binaire `wp` était absent ; `shell-exec` existait mais `proc_open` était
+  dans `disable_functions`. **Tester l'appel, pas seulement lire le schéma.**
+
+## Ce qu'on demande à l'utilisateur
+
+- Un champ de configuration réclamé au lancement est une dette : sur les vingt champs du
+  `we-finalise.json`, **deux seulement n'étaient pas dans le site** (le domaine de production quand
+  le site est sur une préprod, et les horaires quand ils n'y figurent pas). Les dix-huit autres
+  étaient demandés faute d'avoir cherché le canal pour aller les lire. Avant d'ajouter une question
+  à une procédure, chercher où la réponse est déjà écrite.
+- Une question qui bloque et une question qui attend dans un rapport n'ont pas le même coût. Par
+  défaut : **collecter, continuer, regrouper à la fin**. Ne bloquer que si continuer serait
+  dangereux — écrire `formulaire@<domaine de l'agence>` parce qu'on n'a pas le domaine de prod, par
+  exemple : là, on n'écrit rien et on le dit.

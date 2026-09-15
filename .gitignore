@@ -1,2 +1,5 @@
 .DS_Store
 **/.DS_Store
+
+# Dossier de travail de we-finalise (JSON intermédiaires, captures, journal)
+.we-finalise/
